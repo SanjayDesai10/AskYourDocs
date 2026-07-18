@@ -1,80 +1,87 @@
-# ⚡ NotebookLM CLI — Local RAG Agent
+# AskYourDocs — CLI-Based RAG
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/LangChain-⚡-1C3C3A?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Hugging%20Face-🤗-FFD21E?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/ChromaDB-VectorStore-3b82f6?style=for-the-badge" />
-</p>
+A command-line RAG (Retrieval-Augmented Generation) tool that lets you ingest files or directories and ask questions about their content interactively.
 
-A command-line tool modeled after **Google NotebookLM**. Ingest files or directories locally and have an interactive, context-grounded conversation with them.
-
----
-
-## 🚀 Key Features
-
-* **Grounded QA:** Answers are constructed strictly using information retrieved from your documents, avoiding LLM hallucinations.
-* **Local Document Parsing:** Local extraction of PDFs and plaintext files using the `Unstructured` library.
-* **Persistent Vector Memory:** Embeds text chunks using `all-mpnet-base-v2` and persists them locally inside a Chroma DB directory.
-* **Dynamic Context Middleware:** Automatically fetches the top 4 most relevant text segments and injects them into the prompt history before generating answers.
-
----
-
-## 🛠️ Architecture
+## How It Works
 
 ```
-                  ┌───────────────────────────────┐
-                  │    Ingest: PDF / Text Files   │
-                  └───────────────┬───────────────┘
-                                  ▼
-                  ┌───────────────────────────────┐
-                  │   Recursive Chunking (1000)   │
-                  └───────────────┬───────────────┘
-                                  ▼
-                  ┌───────────────────────────────┐
-                  │  Vector Store: Local Chroma   │
-                  └───────────────┬───────────────┘
-                                  ▼
-     ┌─────────────┐      ┌───────────────┐      ┌─────────────┐
-     │ User Query  ├─────▶│  Similarity   ├─────▶│ LLM Response│
-     └─────────────┘      │  Search (K=4) │      └─────────────┘
-                          └───────────────┘
+┌──────────────┐
+│  Load Docs   │
+│ (files/dir)  │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│  Split into  │
+│    Chunks    │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│   Embed &    │
+│   Store in   │
+│   ChromaDB   │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│  Query via   │
+│   dynamic    │
+│   prompt     │
+└──────────────┘
 ```
 
----
 
-## ⚙️ Setup Instructions
 
-### 1. Prerequisites
-Ensure you have **Python 3.12+** and **[uv](https://docs.astral.sh/uv/)** installed on your machine.
+1. **Ingestion** — Documents are loaded via `UnstructuredLoader` (supports PDF, TXT, and more), split into 1000-character chunks with 200-character overlap, and stored in a local ChromaDB vector store.
+2. **Querying** — User queries are matched against stored chunks via similarity search. The top 4 results are injected as context into a system prompt using LangChain's `@dynamic_prompt` middleware, and the LLM generates an answer in a single pass.
 
-### 2. Install Dependencies
-Run the sync command to automatically set up your virtual environment and install all packages (including `unstructured`, `pdfminer`, and local embedding tools):
+## Tech Stack
+
+- LLM: `google/gemma-4-26B-A4B-it` via HuggingFace
+- Embeddings: `sentence-transformers/all-mpnet-base-v2`
+- Vector Store: ChromaDB (persisted locally)
+- Doc Loader: `UnstructuredLoader` (PDF, TXT, etc.)
+- CLI Framework: Click
+- Orchestration: LangChain `create_agent` + `dynamic_prompt`
+
+## Setup
+
+### Prerequisites
+
+- Python >= 3.12
+- uv (recommended) or pip
+
+### Installation
+
 ```bash
+# Clone the repo
+git clone https://github.com/SanjayDesai10/AskYourDocs.git
+cd AskYourDocs
+
+# Install dependencies
 uv sync
 ```
 
-### 3. Add Environment Key
-Create a `.env` file in the root of the project:
+### Environment Variables
+
+Create a `.env` file in the project root:
+
 ```env
 HUGGINGFACEHUB_API_TOKEN=hf_your_token_here
 ```
-> 💡 *Note: You do not need any Unstructured API key. Parsing is completed entirely locally on your device.*
 
----
 
-## 💻 How to Use
-
-Simply run the script and point it to a file or a folder of documents:
+## Usage
 
 ```bash
-# Chat with the sample text document
+# Ingest the sample text file and start querying
 uv run main.py hello.txt
 
-# Chat with the sample PDF document
+# Ingest the sample PDF file
 uv run main.py data/French_Revolution.pdf
 
-# Chat with an entire directory of documents
+# Ingest an entire directory of documents
 uv run main.py ./data
 ```
 
